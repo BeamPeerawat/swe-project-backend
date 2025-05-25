@@ -130,7 +130,7 @@ router.get(
 
 router.get(
   '/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: 'http://localhost:8080/login' }),
+  passport.authenticate('google', { failureRedirect: 'https://swe-project-frontend.vercel.app/login' }),
   (req, res) => {
     const user = {
       _id: req.user._id,
