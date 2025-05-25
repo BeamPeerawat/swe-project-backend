@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const passport = require('../config/passport');
 const User = require('../models/User');
-const Subject = require('../models/Subject');
+const Subject = require('../models/subject');
 
 // Middleware to ensure user is authenticated and authorized
 const ensureAuthenticated = (req, res, next) => {

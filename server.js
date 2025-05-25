@@ -16,7 +16,7 @@ connectDB();
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:8080', 'http://frontend:8080', 'http://localhost:3000', 'http://backend:3000', 'http://203.158.201.73:8080', 'http://203.158.201.73', 'http://localhost:3001', 'http://203.158.201.73:8081'],
+  origin: ['https://swe-project-backend-g841.onrender.com'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
