@@ -10,11 +10,22 @@ const fontkit = require('fontkit');
 // Middleware to ensure user is authenticated and has the correct role
 const ensureAuthenticatedAndRole = (roles) => {
   return (req, res, next) => {
+    console.log('Authenticated:', req.isAuthenticated());
+    console.log('User:', req.user);
     if (req.isAuthenticated() && roles.includes(req.user.role)) {
       return next();
     }
     res.status(403).json({ message: 'คุณไม่มีสิทธิ์เข้าถึงทรัพยากรนี้' });
   };
+};
+
+const ensureAuthenticated = (req, res, next) => {
+  console.log('Authenticated:', req.isAuthenticated());
+  console.log('User:', req.user);
+  if (req.user) {
+    return next();
+  }
+  res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
 };
 
 // POST: Create a new general request (draft or submitted)
