@@ -132,6 +132,9 @@ router.get(
   '/auth/google/callback',
   passport.authenticate('google', { failureRedirect: 'https://swe-project-frontend.vercel.app/login' }),
   (req, res) => {
+    console.log('Google Callback - Session ID:', req.sessionID);
+    console.log('Google Callback - User:', req.user);
+    console.log('Google Callback - Session:', req.session);
     const user = {
       _id: req.user._id,
       email: req.user.email,
@@ -143,7 +146,8 @@ router.get(
       group: req.user.group,
       role: req.user.role,
     };
-    res.redirect(`https://swe-project-frontend.vercel.app/login?user=${encodeURIComponent(JSON.stringify(user))}`);  }
+    res.redirect(`https://swe-project-frontend.vercel.app/login?user=${encodeURIComponent(JSON.stringify(user))}`);
+  }
 );
 
 // GET: ดึงข้อมูลผู้ใช้ที่ล็อกอิน
