@@ -32,7 +32,16 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
 }));
-app.options('*', cors());
+app.options('*', cors()); // จัดการ preflight requests
+
+// Log cookies and session ID
+app.use((req, res, next) => {
+  console.log('Request URL:', req.method, req.url);
+  console.log('Cookies:', req.headers.cookie || 'No cookies');
+  console.log('Session ID:', req.sessionID || 'No session ID');
+  next();
+});
+
 app.use(express.json());
 app.use(
   session({
@@ -43,20 +52,14 @@ app.use(
     cookie: {
       secure: true,
       httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      sameSite: 'none' // สำหรับ cross-site requests
     }
   })
 );
 
 app.use(passport.initialize());
 app.use(passport.session());
-
-// Logging middleware
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Origin', 'https://swe-project-frontend.vercel.app');
-  next();
-});
 
 // Routes
 app.use('/api', apiRoutes);
