@@ -125,16 +125,19 @@ router.post('/users', async (req, res) => {
 // Google OAuth routes
 router.get(
   '/auth/google',
-  passport.authenticate('google', { scope: ['profile', 'email'] })
+  passport.authenticate('google', {
+    scope: ['profile', 'email'],
+    prompt: 'select_account'
+  })
 );
 
+// Google OAuth callback
 router.get(
   '/auth/google/callback',
   passport.authenticate('google', { failureRedirect: 'https://swe-project-frontend.vercel.app/login' }),
   (req, res) => {
-    console.log('Google Callback - Session ID:', req.sessionID);
     console.log('Google Callback - User:', req.user);
-    console.log('Google Callback - Session:', req.session);
+    console.log('Google Callback - Session ID:', req.sessionID);
     const user = {
       _id: req.user._id,
       email: req.user.email,
@@ -144,14 +147,25 @@ router.get(
       branch: req.user.branch,
       contactNumber: req.user.contactNumber,
       group: req.user.group,
-      role: req.user.role,
+      role: req.user.role
     };
-    res.redirect(`https://swe-project-frontend.vercel.app/login?user=${encodeURIComponent(JSON.stringify(user))}`);
+    // บันทึก session ก่อน redirect
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save error:', err);
+        return res.status(500).json({ message: 'Session save failed' });
+      }
+      console.log('Redirecting with user:', user);
+      res.redirect(`https://swe-project-frontend.vercel.app/login?user=${encodeURIComponent(JSON.stringify(user))}`);
+    });
   }
 );
 
 // GET: ดึงข้อมูลผู้ใช้ที่ล็อกอิน
 router.get('/auth/user', (req, res) => {
+  console.log('Get user - Authenticated:', req.isAuthenticated());
+  console.log('Get user - User:', req.user);
+  console.log('Get user - Session ID:', req.sessionID);
   if (req.user) {
     res.json({
       user: {
