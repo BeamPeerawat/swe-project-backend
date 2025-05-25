@@ -143,8 +143,7 @@ router.get(
       group: req.user.group,
       role: req.user.role,
     };
-    res.redirect(`http://localhost:8080/login?user=${encodeURIComponent(JSON.stringify(user))}`);
-  }
+    res.redirect(`https://swe-project-frontend.vercel.app/login?user=${encodeURIComponent(JSON.stringify(user))}`);  }
 );
 
 // GET: ดึงข้อมูลผู้ใช้ที่ล็อกอิน
