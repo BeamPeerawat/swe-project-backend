@@ -8,34 +8,19 @@ const path = require('path');
 const fontkit = require('@pdf-lib/fontkit');
 
 // Middleware เพื่อตรวจสอบว่าเป็น instructor
-// const ensureInstructor = (req, res, next) => {
-//   if (req.user && req.user.role === 'instructor') {
-//     return next();
-//   }
-//   res.status(403).json({ message: 'เฉพาะอาจารย์ประจำวิชาเท่านั้น' });
-// };
-
-// const ensureAuthenticated = (req, res, next) => {
-//   if (req.user) {
-//     return next();
-//   }
-//   res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
-// };
-
-const ensureAuthenticatedAndRole = (roles) => {
-  return (req, res, next) => {
-    console.log('Authenticated:', req.isAuthenticated());
-    console.log('User:', req.user);
-    if (req.isAuthenticated() && roles.includes(req.user.role)) {
-      return next();
-    }
-    res.status(403).json({ message: 'คุณไม่มีสิทธิ์เข้าถึงทรัพยากรนี้' });
-  };
+const ensureInstructor = (req, res, next) => {
+  console.log('ensureInstructor - Authenticated:', req.isAuthenticated());
+  console.log('ensureInstructor - User:', req.user);
+  if (req.user && req.user.role === 'instructor') {
+    return next();
+  }
+  res.status(403).json({ message: 'เฉพาะอาจารย์ประจำวิชาเท่านั้น' });
 };
 
+// Middleware เพื่อตรวจสอบ authentication
 const ensureAuthenticated = (req, res, next) => {
-  console.log('Authenticated:', req.isAuthenticated());
-  console.log('User:', req.user);
+  console.log('ensureAuthenticated - Authenticated:', req.isAuthenticated());
+  console.log('ensureAuthenticated - User:', req.user);
   if (req.user) {
     return next();
   }
