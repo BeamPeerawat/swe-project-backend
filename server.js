@@ -15,6 +15,16 @@ const app = express();
 // เชื่อมต่อ MongoDB
 connectDB();
 
+// Configure MongoStore for session storage
+const store = MongoStore.create({
+  mongoUrl: process.env.MONGO_URI,
+  collectionName: 'sessions'
+});
+
+store.on('error', (error) => {
+  console.error('MongoStore error:', error);
+});
+
 // Middleware
 app.use(cors({
   origin: ['https://swe-project-frontend.vercel.app'],
@@ -28,10 +38,7 @@ app.use(
     secret: 'your-session-secret',
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({
-      mongoUrl: process.env.MONGO_URI,
-      collectionName: 'sessions'
-    }),
+    store: store,
     cookie: {
       secure: true,
       httpOnly: true,
@@ -39,6 +46,7 @@ app.use(
     }
   })
 );
+
 app.use(passport.initialize());
 app.use(passport.session());
 
