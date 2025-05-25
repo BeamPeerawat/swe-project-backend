@@ -310,16 +310,28 @@ router.delete('/:id/cancel', ensureAuthenticatedAndRole(['student']), async (req
 });
 
 // GET: สร้างและดาวน์โหลด PDF สำหรับคำร้องที่อนุมัติแล้ว
-router.get('/:id/pdf', ensureAuthenticatedAndRole(['student']), async (req, res) => {
+router.get('/:id/pdf', async (req, res) => {
   try {
-    const request = await GeneralRequest.findById(req.params.id);
+    const requestId = req.params.id;
+    const userId = req.query.userId; // รับ userId จาก query
+
+    // ตรวจสอบว่า requestId และ userId เป็น ObjectId ที่ถูกต้อง
+    if (!mongoose.Types.ObjectId.isValid(requestId) || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'รูปแบบ requestId หรือ userId ไม่ถูกต้อง' });
+    }
+
+    // ค้นหาคำร้อง
+    const request = await GeneralRequest.findById(requestId);
     if (!request) {
       return res.status(404).json({ message: 'ไม่พบคำร้อง' });
     }
-    // ตรวจสอบว่าเป็นคำร้องของผู้ใช้และอยู่ในสถานะ head_approved
-    if (request.user.toString() !== req.user._id.toString()) {
+
+    // ตรวจสอบว่าเป็นคำร้องของผู้ใช้
+    if (request.user.toString() !== userId) {
       return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึงคำร้องนี้' });
     }
+
+    // ตรวจสอบว่าเป็นสถานะ head_approved
     if (request.status !== 'head_approved') {
       return res.status(400).json({ message: 'สามารถดาวน์โหลด PDF ได้เฉพาะคำร้องที่ได้รับการอนุมัติจากหัวหน้าสาขา' });
     }
@@ -331,7 +343,7 @@ router.get('/:id/pdf', ensureAuthenticatedAndRole(['student']), async (req, res)
 
     // โหลดฟอนต์ภาษาไทย
     const fontBytes = await fs.readFile('fonts/THSarabunNew.ttf');
-    pdfDoc.registerFontkit(fontkit); // ต้องติดตั้ง fontkit ถ้าใช้ฟอนต์แบบกำหนดเอง
+    pdfDoc.registerFontkit(fontkit);
     const thaiFont = await pdfDoc.embedFont(fontBytes);
 
     // เข้าถึงหน้าแรกของ PDF
@@ -339,8 +351,8 @@ router.get('/:id/pdf', ensureAuthenticatedAndRole(['student']), async (req, res)
 
     // กำหนดข้อมูลที่จะเติม
     const petitionTypeText = request.petitionType === 'request_leave' ? 'ขอลา' :
-                        request.petitionType === 'request_transcript' ? 'ขอใบระเบียนผลการศึกษา' :
-                        request.petitionType === 'request_change_course' ? 'ขอเปลี่ยนแปลงรายวิชา' : 'อื่นๆ';
+                            request.petitionType === 'request_transcript' ? 'ขอใบระเบียนผลการศึกษา' :
+                            request.petitionType === 'request_change_course' ? 'ขอเปลี่ยนแปลงรายวิชา' : 'อื่นๆ';
     const fullNameText = request.fullName;
     const studentIdText = request.studentId;
     const facultyText = request.faculty;
@@ -366,7 +378,7 @@ router.get('/:id/pdf', ensureAuthenticatedAndRole(['student']), async (req, res)
 
     // วัน
     page.drawText(dayText, {
-      x: 344.32, // ปรับตำแหน่งตามช่องวันในฟอร์ม
+      x: 344.32,
       y: 743.72,
       size: 14,
       font: thaiFont,
@@ -375,7 +387,7 @@ router.get('/:id/pdf', ensureAuthenticatedAndRole(['student']), async (req, res)
 
     // เดือน
     page.drawText(monthText, {
-      x: 397.44, // เลื่อน x เพื่อให้แยกจากวัน
+      x: 397.44,
       y: 743.72,
       size: 14,
       font: thaiFont,
@@ -384,7 +396,7 @@ router.get('/:id/pdf', ensureAuthenticatedAndRole(['student']), async (req, res)
 
     // ปี
     page.drawText(yearText, {
-      x: 474.24, // เลื่อน x อีกเพื่อให้แยกจากเดือน
+      x: 474.24,
       y: 743.72,
       size: 14,
       font: thaiFont,
@@ -434,7 +446,7 @@ router.get('/:id/pdf', ensureAuthenticatedAndRole(['student']), async (req, res)
       size: 14,
       font: thaiFont,
       color: rgb(0, 0, 0),
-      maxWidth: 400, // ป้องกันข้อความล้น
+      maxWidth: 400,
     });
 
     // เบอร์โทร
