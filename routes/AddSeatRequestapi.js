@@ -30,9 +30,12 @@ const ensureAuthenticated = (req, res, next) => {
 // GET all draft forms for a user
 router.get('/drafts/:userId', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
     const drafts = await AddSeatRequest.find({
       userId: req.params.userId,
-      status: 'draft'
+      status: 'draft',
     }).select('courseCode courseTitle semester academicYear createdAt');
     const count = drafts.length;
     res.json({ drafts, count });
@@ -58,9 +61,9 @@ router.get('/user/:userId', async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ message: 'Invalid userId format' });
     }
-    const requests = await AddSeatRequest.find({ 
-      userId, 
-      status: { $ne: 'draft' } 
+    const requests = await AddSeatRequest.find({
+      userId,
+      status: { $ne: 'draft' },
     }).select('-__v');
     res.json(requests);
   } catch (error) {
@@ -69,8 +72,14 @@ router.get('/user/:userId', async (req, res) => {
 });
 
 // GET add seat requests for instructors
-router.get('/addseatrequests', ensureInstructor, async (req, res) => {
+router.get('/addseatrequests', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'instructor') {
+      return res.status(403).json({ message: 'เฉพาะอาจารย์ประจำวิชาเท่านั้น' });
+    }
     const requests = await AddSeatRequest.find({ status: 'submitted' }).select('-__v');
     res.json(requests);
   } catch (error) {
@@ -95,9 +104,16 @@ router.get('/:id', async (req, res) => {
 // POST submit add seat request
 router.post('/', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'student') {
+      return res.status(403).json({ message: 'เฉพาะนักศึกษาเท่านั้นที่สามารถยื่นคำร้องได้' });
+    }
     const request = new AddSeatRequest({
       ...req.body,
-      status: 'submitted'
+      userId: req.user._id,
+      status: 'submitted',
     });
     const savedRequest = await request.save();
     res.status(201).json(savedRequest);
@@ -109,17 +125,24 @@ router.post('/', async (req, res) => {
 // POST save draft
 router.post('/draft', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'student') {
+      return res.status(403).json({ message: 'เฉพาะนักศึกษาเท่านั้นที่สามารถบันทึกร่างได้' });
+    }
     if (!req.body.userId) {
-      return res.status(400).json({ message: "userId is required" });
+      return res.status(400).json({ message: 'userId is required' });
     }
     const request = new AddSeatRequest({
       ...req.body,
-      status: 'draft'
+      userId: req.user._id,
+      status: 'draft',
     });
     const savedRequest = await request.save();
     const draftCount = await AddSeatRequest.countDocuments({
       userId: req.body.userId,
-      status: 'draft'
+      status: 'draft',
     });
     res.status(201).json({ form: savedRequest, draftCount });
   } catch (error) {
@@ -130,13 +153,22 @@ router.post('/draft', async (req, res) => {
 // PUT update add seat request
 router.put('/:id', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'student') {
+      return res.status(403).json({ message: 'เฉพาะนักศึกษาเท่านั้นที่สามารถอัปเดตคำร้องได้' });
+    }
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: 'Invalid ID format' });
     }
     const request = await AddSeatRequest.findById(req.params.id);
     if (!request) return res.status(404).json({ message: 'Request not found' });
+    if (request.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'ไม่มีสิทธิ์อัปเดตคำร้องนี้' });
+    }
 
-    Object.keys(req.body).forEach(key => {
+    Object.keys(req.body).forEach((key) => {
       if (key !== 'status') request[key] = req.body[key];
     });
 
@@ -150,12 +182,20 @@ router.put('/:id', async (req, res) => {
 // DELETE add seat request
 router.delete('/:id', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'student') {
+      return res.status(403).json({ message: 'เฉพาะนักศึกษาเท่านั้นที่สามารถลบคำร้องได้' });
+    }
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: 'Invalid ID format' });
     }
     const request = await AddSeatRequest.findById(req.params.id);
     if (!request) return res.status(404).json({ message: 'Request not found' });
-
+    if (request.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'ไม่มีสิทธิ์ลบคำร้องนี้' });
+    }
     await request.deleteOne();
     res.json({ message: 'Request deleted' });
   } catch (error) {
@@ -166,16 +206,20 @@ router.delete('/:id', async (req, res) => {
 // POST approve add seat request
 router.post('/:id/approve', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'instructor') {
+      return res.status(403).json({ message: 'เฉพาะอาจารย์ประจำวิชาเท่านั้นที่สามารถอนุมัติได้' });
+    }
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: 'Invalid ID format' });
     }
     const request = await AddSeatRequest.findById(req.params.id);
     if (!request) return res.status(404).json({ message: 'Request not found' });
-
     if (request.status !== 'submitted') {
       return res.status(400).json({ message: 'Request is not in submitted status' });
     }
-
     request.status = 'instructor_approved';
     request.instructorComment = req.body.comment || '';
     const updatedRequest = await request.save();
@@ -188,21 +232,58 @@ router.post('/:id/approve', async (req, res) => {
 // POST reject add seat request
 router.post('/:id/reject', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'instructor') {
+      return res.status(403).json({ message: 'เฉพาะอาจารย์ประจำวิชาเท่านั้นที่สามารถปฏิเสธได้' });
+    }
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: 'Invalid ID format' });
     }
     const request = await AddSeatRequest.findById(req.params.id);
     if (!request) return res.status(404).json({ message: 'Request not found' });
-
     if (request.status !== 'submitted') {
       return res.status(400).json({ message: 'Request is not in submitted status' });
     }
-
     request.status = 'instructor_rejected';
     request.instructorComment = req.body.comment || '';
     const updatedRequest = await request.save();
     res.json(updatedRequest);
   } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// DELETE: Cancel a submitted add seat request
+router.delete('/:id/cancel', async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'student') {
+      return res.status(403).json({ message: 'เฉพาะนักศึกษาเท่านั้นที่สามารถยกเลิกคำร้องได้' });
+    }
+    const request = await AddSeatRequest.findById(req.params.id);
+    if (!request) {
+      return res.status(404).json({ message: 'ไม่พบคำร้อง' });
+    }
+    console.log('Cancel add seat request:', {
+      requestId: req.params.id,
+      userId: req.user._id,
+      requestUserId: request.userId,
+      status: request.status,
+    });
+    if (request.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'ไม่มีสิทธิ์ยกเลิกคำร้องนี้' });
+    }
+    if (!['submitted', 'instructor_approved'].includes(request.status)) {
+      return res.status(400).json({ message: 'สามารถยกเลิกได้เฉพาะคำร้องที่อยู่ในสถานะรอพิจารณาหรืออนุมัติแล้วเท่านั้น' });
+    }
+    await AddSeatRequest.findByIdAndDelete(req.params.id);
+    res.json({ message: 'ยกเลิกคำร้องสำเร็จ' });
+  } catch (error) {
+    console.error('Error canceling add seat request:', error);
     res.status(500).json({ message: error.message });
   }
 });
