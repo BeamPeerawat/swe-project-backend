@@ -244,7 +244,6 @@ router.delete('/:id', async (req, res) => {
 });
 
 // Add new endpoint for generating PDF
-
 router.get('/:id/pdf', async (req, res) => {
   try {
     const { id } = req.params;
