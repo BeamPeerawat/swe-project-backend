@@ -31,8 +31,14 @@ const ensureAuthenticated = (req, res, next) => {
 };
 
 // POST: Create a new general request (draft or submitted)
-router.post('/', ensureAuthenticatedAndRole(['student']), async (req, res) => {
+router.post('/', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'student') {
+      return res.status(403).json({ message: 'เฉพาะนักศึกษาเท่านั้นที่สามารถยื่นคำร้องได้' });
+    }
     const {
       date,
       month,
@@ -46,15 +52,13 @@ router.post('/', ensureAuthenticatedAndRole(['student']), async (req, res) => {
       contactNumber,
       email,
       signature,
-      status = 'pending_advisor', // Default to pending_advisor for submitted requests
+      status = 'pending_advisor',
     } = req.body;
 
-    // Validate email matches authenticated user
     if (req.user.email !== email) {
       return res.status(403).json({ message: 'ไม่สามารถยื่นคำร้องสำหรับอีเมลอื่นได้' });
     }
 
-    // Verify user exists
     const user = await User.findById(req.user._id);
     if (!user) {
       return res.status(404).json({ message: 'ไม่พบผู้ใช้' });
@@ -85,8 +89,14 @@ router.post('/', ensureAuthenticatedAndRole(['student']), async (req, res) => {
 });
 
 // GET: Fetch all drafts for the authenticated student
-router.get('/drafts', ensureAuthenticatedAndRole(['student']), async (req, res) => {
+router.get('/drafts', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'student') {
+      return res.status(403).json({ message: 'เฉพาะนักศึกษาเท่านั้นที่สามารถดูร่างได้' });
+    }
     const drafts = await GeneralRequest.find({
       user: req.user._id,
       status: 'draft',
@@ -116,15 +126,20 @@ router.get('/', async (req, res) => {
 });
 
 // GET: Fetch a specific request by ID
-router.get('/:id', ensureAuthenticatedAndRole(['student', 'advisor', 'head']), async (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
     const request = await GeneralRequest.findById(req.params.id);
     if (!request) {
       return res.status(404).json({ message: 'ไม่พบคำร้อง' });
     }
-    // Students can only view their own requests
     if (req.user.role === 'student' && request.user.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึงคำร้องนี้' });
+    }
+    if (!['student', 'advisor', 'head'].includes(req.user.role)) {
+      return res.status(403).json({ message: 'คุณไม่มีสิทธิ์เข้าถึงทรัพยากรนี้' });
     }
     res.json(request);
   } catch (error) {
@@ -133,8 +148,14 @@ router.get('/:id', ensureAuthenticatedAndRole(['student', 'advisor', 'head']), a
 });
 
 // GET: Fetch pending requests for advisor
-router.get('/advisor/pending', ensureAuthenticatedAndRole(['advisor']), async (req, res) => {
+router.get('/advisor/pending', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'advisor') {
+      return res.status(403).json({ message: 'เฉพาะอาจารย์ที่ปรึกษาเท่านั้นที่สามารถดูคำร้องนี้ได้' });
+    }
     const requests = await GeneralRequest.find({
       status: 'pending_advisor',
     }).sort({ createdAt: -1 });
@@ -145,8 +166,14 @@ router.get('/advisor/pending', ensureAuthenticatedAndRole(['advisor']), async (r
 });
 
 // GET: Fetch advisor-approved requests for head
-router.get('/head/pending', ensureAuthenticatedAndRole(['head']), async (req, res) => {
+router.get('/head/pending', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'head') {
+      return res.status(403).json({ message: 'เฉพาะหัวหน้าสาขาเท่านั้นที่สามารถดูคำร้องนี้ได้' });
+    }
     const requests = await GeneralRequest.find({
       status: 'advisor_approved',
     }).sort({ createdAt: -1 });
@@ -157,8 +184,14 @@ router.get('/head/pending', ensureAuthenticatedAndRole(['head']), async (req, re
 });
 
 // POST: Advisor approve request
-router.post('/:id/approve', ensureAuthenticatedAndRole(['advisor']), async (req, res) => {
+router.post('/:id/approve', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'advisor') {
+      return res.status(403).json({ message: 'เฉพาะอาจารย์ที่ปรึกษาเท่านั้นที่สามารถอนุมัติได้' });
+    }
     const request = await GeneralRequest.findById(req.params.id);
     if (!request) {
       return res.status(404).json({ message: 'ไม่พบคำร้อง' });
@@ -177,8 +210,14 @@ router.post('/:id/approve', ensureAuthenticatedAndRole(['advisor']), async (req,
 });
 
 // POST: Advisor reject request
-router.post('/:id/reject', ensureAuthenticatedAndRole(['advisor']), async (req, res) => {
+router.post('/:id/reject', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'advisor') {
+      return res.status(403).json({ message: 'เฉพาะอาจารย์ที่ปรึกษาเท่านั้นที่สามารถปฏิเสธได้' });
+    }
     const request = await GeneralRequest.findById(req.params.id);
     if (!request) {
       return res.status(404).json({ message: 'ไม่พบคำร้อง' });
@@ -197,8 +236,14 @@ router.post('/:id/reject', ensureAuthenticatedAndRole(['advisor']), async (req, 
 });
 
 // POST: Head approve request
-router.post('/:id/head/approve', ensureAuthenticatedAndRole(['head']), async (req, res) => {
+router.post('/:id/head/approve', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'head') {
+      return res.status(403).json({ message: 'เฉพาะหัวหน้าสาขาเท่านั้นที่สามารถอนุมัติได้' });
+    }
     const request = await GeneralRequest.findById(req.params.id);
     if (!request) {
       return res.status(404).json({ message: 'ไม่พบคำร้อง' });
@@ -217,8 +262,14 @@ router.post('/:id/head/approve', ensureAuthenticatedAndRole(['head']), async (re
 });
 
 // POST: Head reject request
-router.post('/:id/head/reject', ensureAuthenticatedAndRole(['head']), async (req, res) => {
+router.post('/:id/head/reject', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'head') {
+      return res.status(403).json({ message: 'เฉพาะหัวหน้าสาขาเท่านั้นที่สามารถปฏิเสธได้' });
+    }
     const request = await GeneralRequest.findById(req.params.id);
     if (!request) {
       return res.status(404).json({ message: 'ไม่พบคำร้อง' });
@@ -237,11 +288,15 @@ router.post('/:id/head/reject', ensureAuthenticatedAndRole(['head']), async (req
 });
 
 // PUT: Update a general request
-router.put('/:id', ensureAuthenticatedAndRole(['student']), async (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'student') {
+      return res.status(403).json({ message: 'เฉพาะนักศึกษาเท่านั้นที่สามารถอัปเดตคำร้องได้' });
+    }
     const updates = req.body;
-
-    // Prevent updating user or email fields
     delete updates.user;
     delete updates.email;
 
@@ -249,13 +304,9 @@ router.put('/:id', ensureAuthenticatedAndRole(['student']), async (req, res) => 
     if (!request) {
       return res.status(404).json({ message: 'ไม่พบคำร้อง' });
     }
-
-    // Ensure the request belongs to the authenticated user
     if (request.user.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'ไม่มีสิทธิ์อัปเดตคำร้องนี้' });
     }
-
-    // Only allow updates if the request is in draft status
     if (request.status !== 'draft') {
       return res.status(400).json({ message: 'สามารถแก้ไขได้เฉพาะคำร้องในสถานะร่างเท่านั้น' });
     }
@@ -272,8 +323,14 @@ router.put('/:id', ensureAuthenticatedAndRole(['student']), async (req, res) => 
 });
 
 // DELETE: Delete a draft
-router.delete('/:id', ensureAuthenticatedAndRole(['student']), async (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'student') {
+      return res.status(403).json({ message: 'เฉพาะนักศึกษาเท่านั้นที่สามารถลบร่างได้' });
+    }
     const request = await GeneralRequest.findById(req.params.id);
     if (!request) {
       return res.status(404).json({ message: 'ไม่พบคำร้อง' });
@@ -292,12 +349,24 @@ router.delete('/:id', ensureAuthenticatedAndRole(['student']), async (req, res) 
 });
 
 // DELETE: Cancel a submitted request
-router.delete('/:id/cancel', ensureAuthenticatedAndRole(['student']), async (req, res) => {
+router.delete('/:id/cancel', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'student') {
+      return res.status(403).json({ message: 'เฉพาะนักศึกษาเท่านั้นที่สามารถยกเลิกคำร้องได้' });
+    }
     const request = await GeneralRequest.findById(req.params.id);
     if (!request) {
       return res.status(404).json({ message: 'ไม่พบคำร้อง' });
     }
+    console.log('Cancel general request:', {
+      requestId: req.params.id,
+      userId: req.user._id,
+      requestUser: request.user.toString(),
+      status: request.status,
+    });
     if (request.user.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'ไม่มีสิทธิ์ยกเลิกคำร้องนี้' });
     }
@@ -307,6 +376,7 @@ router.delete('/:id/cancel', ensureAuthenticatedAndRole(['student']), async (req
     await GeneralRequest.findByIdAndDelete(req.params.id);
     res.json({ message: 'ยกเลิกคำร้องสำเร็จ' });
   } catch (error) {
+    console.error('Error canceling general request:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -315,9 +385,9 @@ router.delete('/:id/cancel', ensureAuthenticatedAndRole(['student']), async (req
 router.get('/:id/pdf', async (req, res) => {
   try {
     const requestId = req.params.id;
-    const userId = req.query.userId;
+    const userId = req.query.userId; // รับ userId จาก query
 
-    // ตรวจสอบ ObjectId
+    // ตรวจสอบว่า requestId และ userId เป็น ObjectId ที่ถูกต้อง
     if (!mongoose.Types.ObjectId.isValid(requestId) || !mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ message: 'รูปแบบ requestId หรือ userId ไม่ถูกต้อง' });
     }
@@ -328,91 +398,164 @@ router.get('/:id/pdf', async (req, res) => {
       return res.status(404).json({ message: 'ไม่พบคำร้อง' });
     }
 
-    // ตรวจสอบ owner
+    // ตรวจสอบว่าเป็นคำร้องของผู้ใช้
     if (request.user.toString() !== userId) {
       return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึงคำร้องนี้' });
     }
 
-    // ตรวจสอบ status
+    // ตรวจสอบว่าเป็นสถานะ head_approved
     if (request.status !== 'head_approved') {
       return res.status(400).json({ message: 'สามารถดาวน์โหลด PDF ได้เฉพาะคำร้องที่ได้รับการอนุมัติจากหัวหน้าสาขา' });
     }
 
-    // กำหนด paths
+    // โหลด PDF ต้นฉบับ
     const templatePath = path.join(__dirname, '../templates/RE.01-คำร้องทั่วไป.pdf');
-    const fontPath = path.join(__dirname, '../fonts/THSarabunNew.ttf');
-
-    // ตรวจสอบไฟล์
-    try {
-      await fs.access(templatePath);
-      await fs.access(fontPath);
-    } catch (error) {
-      console.error('File access error:', { templatePath, fontPath, error: error.message });
-      return res.status(500).json({ message: `ไม่พบไฟล์: ${error.message}` });
-    }
-
-    // โหลด PDF
     const pdfBytes = await fs.readFile(templatePath);
     const pdfDoc = await PDFDocument.load(pdfBytes);
 
-    // โหลดฟอนต์
-    pdfDoc.registerFontkit(fontkit);
+    // โหลดฟอนต์ภาษาไทย
+    const fontPath = path.join(__dirname, '../fonts/THSarabunNew.ttf');
     const fontBytes = await fs.readFile(fontPath);
+    pdfDoc.registerFontkit(fontkit);
     const thaiFont = await pdfDoc.embedFont(fontBytes);
 
-    // เข้าถึงหน้าแรก
+    // เข้าถึงหน้าแรกของ PDF
     const page = pdfDoc.getPages()[0];
 
-    // ฟังก์ชัน drawText
-    const drawText = (text, x, y, size = 14, maxWidth = Infinity) => {
-      let displayText = text || '';
-      if (maxWidth !== Infinity) {
-        let currentWidth = thaiFont.widthOfTextAtSize(displayText, size);
-        if (currentWidth > maxWidth) {
-          let truncatedText = displayText;
-          while (thaiFont.widthOfTextAtSize(truncatedText + '...', size) > maxWidth && truncatedText.length > 0) {
-            truncatedText = truncatedText.slice(0, -1);
-          }
-          displayText = truncatedText + '...';
-        }
-      }
-      page.drawText(displayText, { x, y, size, font: thaiFont, color: rgb(0, 0, 0) });
-    };
-
-    // กำหนดข้อมูล
+    // กำหนดข้อมูลที่จะเติม
     const petitionTypeText = request.petitionType === 'request_leave' ? 'ขอลา' :
                             request.petitionType === 'request_transcript' ? 'ขอใบระเบียนผลการศึกษา' :
                             request.petitionType === 'request_change_course' ? 'ขอเปลี่ยนแปลงรายวิชา' : 'อื่นๆ';
+    const fullNameText = request.fullName;
+    const studentIdText = request.studentId;
+    const facultyText = request.faculty;
+    const fieldOfStudyText = request.fieldOfStudy;
+    const detailsText = request.details;
+    const contactNumberText = request.contactNumber;
+    const emailText = request.email;
 
-    // วาดข้อความ
-    drawText(petitionTypeText, 81.28, 717.76);
-    drawText(request.date || '', 344.32, 743.72);
-    drawText(request.month || '', 397.44, 743.72);
-    drawText(request.year || '', 474.24, 743.72);
-    drawText(request.fullName || '', 198.12, 663.36);
-    drawText(request.studentId || '', 460.80, 663.36);
-    drawText(request.faculty || '', 112.00, 609.32);
-    drawText(request.fieldOfStudy || '', 344.32, 609.32);
-    drawText(request.details || '', 149.76, 581.16, 14, 400);
-    drawText(request.contactNumber || '', 112.64, 507.56);
-    drawText(request.email || '', 112.64, 489.64);
+    // แยกวัน เดือน ปี ออกเป็นตัวแปร
+    const dayText = request.date;
+    const monthText = request.month;
+    const yearText = request.year;
 
-    // บันทึกและส่ง PDF
-    const pdfBytesModified = await pdfDoc.save();
-    res.set({
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename=general_request_${request._id}.pdf`
+    // วาดข้อความลงใน PDF
+    // เรื่อง
+    page.drawText(petitionTypeText, {
+      x: 81.28,
+      y: 717.76,
+      size: 14,
+      font: thaiFont,
+      color: rgb(0, 0, 0),
     });
-    res.send(Buffer.from(pdfBytesModified));
+
+    // วัน
+    page.drawText(dayText, {
+      x: 344.32,
+      y: 743.72,
+      size: 14,
+      font: thaiFont,
+      color: rgb(0, 0, 0),
+    });
+
+    // เดือน
+    page.drawText(monthText, {
+      x: 397.44,
+      y: 743.72,
+      size: 14,
+      font: thaiFont,
+      color: rgb(0, 0, 0),
+    });
+
+    // ปี
+    page.drawText(yearText, {
+      x: 474.24,
+      y: 743.72,
+      size: 14,
+      font: thaiFont,
+      color: rgb(0, 0, 0),
+    });
+
+    // ชื่อนักศึกษา
+    page.drawText(fullNameText, {
+      x: 198.12,
+      y: 663.36,
+      size: 14,
+      font: thaiFont,
+      color: rgb(0, 0, 0),
+    });
+
+    // รหัสนักศึกษา
+    page.drawText(studentIdText, {
+      x: 460.80,
+      y: 663.36,
+      size: 14,
+      font: thaiFont,
+      color: rgb(0, 0, 0),
+    });
+
+    // คณะ
+    page.drawText(facultyText, {
+      x: 112.00,
+      y: 609.32,
+      size: 14,
+      font: thaiFont,
+      color: rgb(0, 0, 0),
+    });
+
+    // สาขาวิชา
+    page.drawText(fieldOfStudyText, {
+      x: 344.32,
+      y: 609.32,
+      size: 14,
+      font: thaiFont,
+      color: rgb(0, 0, 0),
+    });
+
+    // เหตุผล
+    page.drawText(detailsText, {
+      x: 149.76,
+      y: 581.16,
+      size: 14,
+      font: thaiFont,
+      color: rgb(0, 0, 0),
+      maxWidth: 400,
+    });
+
+    // เบอร์โทร
+    page.drawText(contactNumberText, {
+      x: 112.64,
+      y: 507.56,
+      size: 14,
+      font: thaiFont,
+      color: rgb(0, 0, 0),
+    });
+
+    // อีเมล
+    page.drawText(emailText, {
+      x: 112.64,
+      y: 489.64,
+      size: 14,
+      font: thaiFont,
+      color: rgb(0, 0, 0),
+    });
+
+  // บันทึกและส่ง PDF
+  const pdfBytesModified = await pdfDoc.save();
+  res.set({
+    'Content-Type': 'application/pdf',
+    'Content-Disposition': `attachment; filename=general_request_${request._id}.pdf`
+  });
+  res.send(Buffer.from(pdfBytesModified));
   } catch (error) {
-    console.error('Error generating PDF:', {
-      message: error.message,
-      stack: error.stack,
-      requestId,
-      userId
-    });
-    res.status(500).json({ message: `เกิดข้อผิดพลาดในการสร้าง PDF: ${error.message}` });
+  console.error('Error generating PDF:', {
+    message: error.message,
+    stack: error.stack,
+    requestId,
+    userId
+  });
+  res.status(500).json({ message: `เกิดข้อผิดพลาดในการสร้าง PDF: ${error.message}` });
   }
-});
+  });
 
 module.exports = router;
