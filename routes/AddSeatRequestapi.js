@@ -7,26 +7,6 @@ const fs = require('fs').promises;
 const path = require('path');
 const fontkit = require('@pdf-lib/fontkit');
 
-// Middleware เพื่อตรวจสอบว่าเป็น instructor
-const ensureInstructor = (req, res, next) => {
-  console.log('ensureInstructor - Authenticated:', req.isAuthenticated());
-  console.log('ensureInstructor - User:', req.user);
-  if (req.user && req.user.role === 'instructor') {
-    return next();
-  }
-  res.status(403).json({ message: 'เฉพาะอาจารย์ประจำวิชาเท่านั้น' });
-};
-
-// Middleware เพื่อตรวจสอบ authentication
-const ensureAuthenticated = (req, res, next) => {
-  console.log('ensureAuthenticated - Authenticated:', req.isAuthenticated());
-  console.log('ensureAuthenticated - User:', req.user);
-  if (req.user) {
-    return next();
-  }
-  res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
-};
-
 // GET all draft forms for a user
 router.get('/drafts/:userId', async (req, res) => {
   try {
@@ -259,6 +239,7 @@ router.post('/:id/reject', async (req, res) => {
 router.delete('/:id/cancel', async (req, res) => {
   try {
     if (!req.user) {
+      console.log('No req.user, rejecting request');
       return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
     }
     if (req.user.role !== 'student') {
@@ -273,6 +254,7 @@ router.delete('/:id/cancel', async (req, res) => {
       userId: req.user._id,
       requestUserId: request.userId,
       status: request.status,
+      sessionId: req.sessionID,
     });
     if (request.userId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'ไม่มีสิทธิ์ยกเลิกคำร้องนี้' });
