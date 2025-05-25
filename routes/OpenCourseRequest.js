@@ -313,6 +313,7 @@ router.delete('/:id', async (req, res) => {
 router.delete('/:id/cancel', async (req, res) => {
   try {
     if (!req.user) {
+      console.log('No req.user, rejecting request');
       return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
     }
     if (req.user.role !== 'student') {
@@ -327,6 +328,7 @@ router.delete('/:id/cancel', async (req, res) => {
       userId: req.user._id,
       requestUserId: form.userId,
       status: form.status,
+      sessionId: req.sessionID,
     });
     if (form.userId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'ไม่มีสิทธิ์ยกเลิกคำร้องนี้' });
