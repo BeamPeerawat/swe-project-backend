@@ -7,6 +7,7 @@ const User = require('../models/User');
 const { PDFDocument, rgb } = require('pdf-lib');
 const fs = require('fs').promises;
 const fontkit = require('fontkit');
+const path = require('path'); // เพิ่ม path
 
 // Middleware to ensure user is authenticated and has the correct role
 const ensureAuthenticatedAndRole = (roles) => {
@@ -314,9 +315,9 @@ router.delete('/:id/cancel', ensureAuthenticatedAndRole(['student']), async (req
 router.get('/:id/pdf', async (req, res) => {
   try {
     const requestId = req.params.id;
-    const userId = req.query.userId; // รับ userId จาก query
+    const userId = req.query.userId;
 
-    // ตรวจสอบว่า requestId และ userId เป็น ObjectId ที่ถูกต้อง
+    // ตรวจสอบ ObjectId
     if (!mongoose.Types.ObjectId.isValid(requestId) || !mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ message: 'รูปแบบ requestId หรือ userId ไม่ถูกต้อง' });
     }
@@ -327,156 +328,90 @@ router.get('/:id/pdf', async (req, res) => {
       return res.status(404).json({ message: 'ไม่พบคำร้อง' });
     }
 
-    // ตรวจสอบว่าเป็นคำร้องของผู้ใช้
+    // ตรวจสอบ owner
     if (request.user.toString() !== userId) {
       return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึงคำร้องนี้' });
     }
 
-    // ตรวจสอบว่าเป็นสถานะ head_approved
+    // ตรวจสอบ status
     if (request.status !== 'head_approved') {
       return res.status(400).json({ message: 'สามารถดาวน์โหลด PDF ได้เฉพาะคำร้องที่ได้รับการอนุมัติจากหัวหน้าสาขา' });
     }
 
-    // โหลด PDF ต้นฉบับ
+    // กำหนด paths
     const templatePath = path.join(__dirname, '../templates/RE.01-คำร้องทั่วไป.pdf');
+    const fontPath = path.join(__dirname, '../fonts/THSarabunNew.ttf');
+
+    // ตรวจสอบไฟล์
+    try {
+      await fs.access(templatePath);
+      await fs.access(fontPath);
+    } catch (error) {
+      console.error('File access error:', { templatePath, fontPath, error: error.message });
+      return res.status(500).json({ message: `ไม่พบไฟล์: ${error.message}` });
+    }
+
+    // โหลด PDF
     const pdfBytes = await fs.readFile(templatePath);
     const pdfDoc = await PDFDocument.load(pdfBytes);
 
-    // โหลดฟอนต์ภาษาไทย
-    const fontPath = path.join(__dirname, '../fonts/THSarabunNew.ttf');
-    const fontBytes = await fs.readFile(fontPath);
+    // โหลดฟอนต์
     pdfDoc.registerFontkit(fontkit);
+    const fontBytes = await fs.readFile(fontPath);
     const thaiFont = await pdfDoc.embedFont(fontBytes);
 
-    // เข้าถึงหน้าแรกของ PDF
+    // เข้าถึงหน้าแรก
     const page = pdfDoc.getPages()[0];
 
-    // กำหนดข้อมูลที่จะเติม
+    // ฟังก์ชัน drawText
+    const drawText = (text, x, y, size = 14, maxWidth = Infinity) => {
+      let displayText = text || '';
+      if (maxWidth !== Infinity) {
+        let currentWidth = thaiFont.widthOfTextAtSize(displayText, size);
+        if (currentWidth > maxWidth) {
+          let truncatedText = displayText;
+          while (thaiFont.widthOfTextAtSize(truncatedText + '...', size) > maxWidth && truncatedText.length > 0) {
+            truncatedText = truncatedText.slice(0, -1);
+          }
+          displayText = truncatedText + '...';
+        }
+      }
+      page.drawText(displayText, { x, y, size, font: thaiFont, color: rgb(0, 0, 0) });
+    };
+
+    // กำหนดข้อมูล
     const petitionTypeText = request.petitionType === 'request_leave' ? 'ขอลา' :
                             request.petitionType === 'request_transcript' ? 'ขอใบระเบียนผลการศึกษา' :
                             request.petitionType === 'request_change_course' ? 'ขอเปลี่ยนแปลงรายวิชา' : 'อื่นๆ';
-    const fullNameText = request.fullName;
-    const studentIdText = request.studentId;
-    const facultyText = request.faculty;
-    const fieldOfStudyText = request.fieldOfStudy;
-    const detailsText = request.details;
-    const contactNumberText = request.contactNumber;
-    const emailText = request.email;
 
-    // แยกวัน เดือน ปี ออกเป็นตัวแปร
-    const dayText = request.date;
-    const monthText = request.month;
-    const yearText = request.year;
+    // วาดข้อความ
+    drawText(petitionTypeText, 81.28, 717.76);
+    drawText(request.date || '', 344.32, 743.72);
+    drawText(request.month || '', 397.44, 743.72);
+    drawText(request.year || '', 474.24, 743.72);
+    drawText(request.fullName || '', 198.12, 663.36);
+    drawText(request.studentId || '', 460.80, 663.36);
+    drawText(request.faculty || '', 112.00, 609.32);
+    drawText(request.fieldOfStudy || '', 344.32, 609.32);
+    drawText(request.details || '', 149.76, 581.16, 14, 400);
+    drawText(request.contactNumber || '', 112.64, 507.56);
+    drawText(request.email || '', 112.64, 489.64);
 
-    // วาดข้อความลงใน PDF
-    // เรื่อง
-    page.drawText(petitionTypeText, {
-      x: 81.28,
-      y: 717.76,
-      size: 14,
-      font: thaiFont,
-      color: rgb(0, 0, 0),
-    });
-
-    // วัน
-    page.drawText(dayText, {
-      x: 344.32,
-      y: 743.72,
-      size: 14,
-      font: thaiFont,
-      color: rgb(0, 0, 0),
-    });
-
-    // เดือน
-    page.drawText(monthText, {
-      x: 397.44,
-      y: 743.72,
-      size: 14,
-      font: thaiFont,
-      color: rgb(0, 0, 0),
-    });
-
-    // ปี
-    page.drawText(yearText, {
-      x: 474.24,
-      y: 743.72,
-      size: 14,
-      font: thaiFont,
-      color: rgb(0, 0, 0),
-    });
-
-    // ชื่อนักศึกษา
-    page.drawText(fullNameText, {
-      x: 198.12,
-      y: 663.36,
-      size: 14,
-      font: thaiFont,
-      color: rgb(0, 0, 0),
-    });
-
-    // รหัสนักศึกษา
-    page.drawText(studentIdText, {
-      x: 460.80,
-      y: 663.36,
-      size: 14,
-      font: thaiFont,
-      color: rgb(0, 0, 0),
-    });
-
-    // คณะ
-    page.drawText(facultyText, {
-      x: 112.00,
-      y: 609.32,
-      size: 14,
-      font: thaiFont,
-      color: rgb(0, 0, 0),
-    });
-
-    // สาขาวิชา
-    page.drawText(fieldOfStudyText, {
-      x: 344.32,
-      y: 609.32,
-      size: 14,
-      font: thaiFont,
-      color: rgb(0, 0, 0),
-    });
-
-    // เหตุผล
-    page.drawText(detailsText, {
-      x: 149.76,
-      y: 581.16,
-      size: 14,
-      font: thaiFont,
-      color: rgb(0, 0, 0),
-      maxWidth: 400,
-    });
-
-    // เบอร์โทร
-    page.drawText(contactNumberText, {
-      x: 112.64,
-      y: 507.56,
-      size: 14,
-      font: thaiFont,
-      color: rgb(0, 0, 0),
-    });
-
-    // อีเมล
-    page.drawText(emailText, {
-      x: 112.64,
-      y: 489.64,
-      size: 14,
-      font: thaiFont,
-      color: rgb(0, 0, 0),
-    });
-
-    // บันทึก PDF
+    // บันทึกและส่ง PDF
     const pdfBytesModified = await pdfDoc.save();
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=general_request_${request._id}.pdf`);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename=general_request_${request._id}.pdf`
+    });
     res.send(Buffer.from(pdfBytesModified));
   } catch (error) {
-    console.error('Error generating PDF:', error);
-    res.status(500).json({ message: 'เกิดข้อผิดพลาดในการสร้าง PDF' });
+    console.error('Error generating PDF:', {
+      message: error.message,
+      stack: error.stack,
+      requestId,
+      userId
+    });
+    res.status(500).json({ message: `เกิดข้อผิดพลาดในการสร้าง PDF: ${error.message}` });
   }
 });
 
