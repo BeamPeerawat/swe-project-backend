@@ -54,6 +54,8 @@ app.use(passport.session());
 // Logging middleware
 app.use((req, res, next) => {
   console.log(`${req.method} ${req.url}`);
+  console.log('Query:', req.query);
+  console.log('Params:', req.params);
   console.log('Cookies:', req.headers.cookie || 'No cookies');
   console.log('Session ID:', req.sessionID || 'No session ID');
   next();

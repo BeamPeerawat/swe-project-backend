@@ -95,15 +95,20 @@ router.get('/drafts', ensureAuthenticatedAndRole(['student']), async (req, res) 
   }
 });
 
-// GET: Fetch all submitted requests for the authenticated student
-router.get('/', ensureAuthenticatedAndRole(['student']), async (req, res) => {
+// GET: Fetch all submitted requests for a user by userId
+router.get('/', async (req, res) => {
   try {
+    const { userId } = req.query;
+    if (!userId) {
+      return res.status(400).json({ message: 'ต้องระบุ userId' });
+    }
     const requests = await GeneralRequest.find({
-      user: req.user._id,
+      user: userId,
       status: { $ne: 'draft' },
     }).sort({ createdAt: -1 });
     res.json(requests);
   } catch (error) {
+    console.error('Error fetching general requests:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -336,7 +341,7 @@ router.get('/:id/pdf', ensureAuthenticatedAndRole(['student']), async (req, res)
     const petitionTypeText = request.petitionType === 'request_leave' ? 'ขอลา' :
                         request.petitionType === 'request_transcript' ? 'ขอใบระเบียนผลการศึกษา' :
                         request.petitionType === 'request_change_course' ? 'ขอเปลี่ยนแปลงรายวิชา' : 'อื่นๆ';
-      const fullNameText = request.fullName;
+    const fullNameText = request.fullName;
     const studentIdText = request.studentId;
     const facultyText = request.faculty;
     const fieldOfStudyText = request.fieldOfStudy;
@@ -344,47 +349,47 @@ router.get('/:id/pdf', ensureAuthenticatedAndRole(['student']), async (req, res)
     const contactNumberText = request.contactNumber;
     const emailText = request.email;
 
-// แยกวัน เดือน ปี ออกเป็นตัวแปร
-const dayText = request.date;
-const monthText = request.month;
-const yearText = request.year;
+    // แยกวัน เดือน ปี ออกเป็นตัวแปร
+    const dayText = request.date;
+    const monthText = request.month;
+    const yearText = request.year;
 
-// วาดข้อความลงใน PDF
-// เรื่อง
-page.drawText(petitionTypeText, {
-  x: 81.28,
-  y: 717.76,
-  size: 14,
-  font: thaiFont,
-  color: rgb(0, 0, 0),
-});
+    // วาดข้อความลงใน PDF
+    // เรื่อง
+    page.drawText(petitionTypeText, {
+      x: 81.28,
+      y: 717.76,
+      size: 14,
+      font: thaiFont,
+      color: rgb(0, 0, 0),
+    });
 
-// วัน
-page.drawText(dayText, {
-  x: 344.32, // ปรับตำแหน่งตามช่องวันในฟอร์ม
-  y: 743.72,
-  size: 14,
-  font: thaiFont,
-  color: rgb(0, 0, 0),
-});
+    // วัน
+    page.drawText(dayText, {
+      x: 344.32, // ปรับตำแหน่งตามช่องวันในฟอร์ม
+      y: 743.72,
+      size: 14,
+      font: thaiFont,
+      color: rgb(0, 0, 0),
+    });
 
-// เดือน
-page.drawText(monthText, {
-  x: 397.44, // เลื่อน x เพื่อให้แยกจากวัน
-  y: 743.72,
-  size: 14,
-  font: thaiFont,
-  color: rgb(0, 0, 0),
-});
+    // เดือน
+    page.drawText(monthText, {
+      x: 397.44, // เลื่อน x เพื่อให้แยกจากวัน
+      y: 743.72,
+      size: 14,
+      font: thaiFont,
+      color: rgb(0, 0, 0),
+    });
 
-// ปี
-page.drawText(yearText, {
-  x: 474.24, // เลื่อน x อีกเพื่อให้แยกจากเดือน
-  y: 743.72,
-  size: 14,
-  font: thaiFont,
-  color: rgb(0, 0, 0),
-});
+    // ปี
+    page.drawText(yearText, {
+      x: 474.24, // เลื่อน x อีกเพื่อให้แยกจากเดือน
+      y: 743.72,
+      size: 14,
+      font: thaiFont,
+      color: rgb(0, 0, 0),
+    });
 
     // ชื่อนักศึกษา
     page.drawText(fullNameText, {
@@ -460,6 +465,5 @@ page.drawText(yearText, {
     res.status(500).json({ message: 'เกิดข้อผิดพลาดในการสร้าง PDF' });
   }
 });
-
 
 module.exports = router;

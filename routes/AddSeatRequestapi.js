@@ -51,15 +51,17 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET เพิ่มคำขอที่นั่งสำหรับผู้ใช้เฉพาะ (นักเรียนสามารถเข้าถึงได้)
-router.get('/user/:userId', ensureAuthenticated, async (req, res) => {
+// GET เพิ่มคำขอที่นั่งสำหรับผู้ใช้เฉพาะ
+router.get('/user/:userId', async (req, res) => {
   try {
     const userId = req.params.userId;
-    // Ensure the authenticated user is fetching their own data
-    if (req.user._id.toString() !== userId) {
-      return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึงข้อมูลของผู้ใช้คนอื่น' });
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid userId format' });
     }
-    const requests = await AddSeatRequest.find({ userId, status: { $ne: 'draft' } }).select('-__v');
+    const requests = await AddSeatRequest.find({ 
+      userId, 
+      status: { $ne: 'draft' } 
+    }).select('-__v');
     res.json(requests);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -234,28 +236,27 @@ router.get('/:id/pdf', async (req, res) => {
     const { height } = page.getSize();
 
     // ฟังก์ชันสำหรับเขียนข้อความ
-   // ฟังก์ชันสำหรับเขียนข้อความ
-const drawText = (text, x, y, size = 16, maxWidth = Infinity) => {
-  // ถ้าข้อความยาวเกิน maxWidth ให้ตัดข้อความ
-  let displayText = text;
-  let currentWidth = thaiFont.widthOfTextAtSize(text, size);
+    const drawText = (text, x, y, size = 16, maxWidth = Infinity) => {
+      // ถ้าข้อความยาวเกิน maxWidth ให้ตัดข้อความ
+      let displayText = text;
+      let currentWidth = thaiFont.widthOfTextAtSize(text, size);
 
-  if (currentWidth > maxWidth) {
-    let truncatedText = text;
-    while (thaiFont.widthOfTextAtSize(truncatedText + '...', size) > maxWidth && truncatedText.length > 0) {
-      truncatedText = truncatedText.slice(0, -1);
-    }
-    displayText = truncatedText + '...';
-  }
+      if (currentWidth > maxWidth) {
+        let truncatedText = text;
+        while (thaiFont.widthOfTextAtSize(truncatedText + '...', size) > maxWidth && truncatedText.length > 0) {
+          truncatedText = truncatedText.slice(0, -1);
+        }
+        displayText = truncatedText + '...';
+      }
 
-  page.drawText(displayText, {
-    x,
-    y,
-    size,
-    font: thaiFont,
-    color: require('pdf-lib').rgb(0, 0, 0),
-  });
-};
+      page.drawText(displayText, {
+        x,
+        y,
+        size,
+        font: thaiFont,
+        color: require('pdf-lib').rgb(0, 0, 0),
+      });
+    };
 
     // กรอกข้อมูลลงใน PDF
     drawText(request.semester, 344.00, 773.43); // ภาคการศึกษา
@@ -295,6 +296,5 @@ const drawText = (text, x, y, size = 16, maxWidth = Infinity) => {
     res.status(500).json({ message: error.message });
   }
 });
-
 
 module.exports = router;
