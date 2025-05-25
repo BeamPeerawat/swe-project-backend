@@ -312,12 +312,10 @@ router.delete('/:id', async (req, res) => {
 // DELETE: Cancel a submitted open course request
 router.delete('/:id/cancel', async (req, res) => {
   try {
-    if (!req.user) {
-      console.log('No req.user, rejecting request');
-      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
-    }
-    if (req.user.role !== 'student') {
-      return res.status(403).json({ message: 'เฉพาะนักศึกษาเท่านั้นที่สามารถยกเลิกคำร้องได้' });
+    const userId = req.query.userId;
+    if (!userId) {
+      console.log('No userId provided, rejecting request');
+      return res.status(401).json({ message: 'ต้องระบุ userId' });
     }
     const form = await OpenCourseRequest.findById(req.params.id);
     if (!form) {
@@ -325,12 +323,11 @@ router.delete('/:id/cancel', async (req, res) => {
     }
     console.log('Cancel open course request:', {
       requestId: req.params.id,
-      userId: req.user._id,
-      requestUserId: form.userId,
+      userId: userId,
+      requestUserId: form.userId.toString(),
       status: form.status,
-      sessionId: req.sessionID,
     });
-    if (form.userId.toString() !== req.user._id.toString()) {
+    if (form.userId.toString() !== userId.toString()) {
       return res.status(403).json({ message: 'ไม่มีสิทธิ์ยกเลิกคำร้องนี้' });
     }
     if (!['pending_advisor', 'advisor_approved'].includes(form.status)) {
@@ -343,7 +340,6 @@ router.delete('/:id/cancel', async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-
 // Add new endpoint for generating PDF
 router.get('/:id/pdf', async (req, res) => {
   try {

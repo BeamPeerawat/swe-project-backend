@@ -238,12 +238,10 @@ router.post('/:id/reject', async (req, res) => {
 // DELETE: Cancel a submitted add seat request
 router.delete('/:id/cancel', async (req, res) => {
   try {
-    if (!req.user) {
-      console.log('No req.user, rejecting request');
-      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
-    }
-    if (req.user.role !== 'student') {
-      return res.status(403).json({ message: 'เฉพาะนักศึกษาเท่านั้นที่สามารถยกเลิกคำร้องได้' });
+    const userId = req.query.userId;
+    if (!userId) {
+      console.log('No userId provided, rejecting request');
+      return res.status(401).json({ message: 'ต้องระบุ userId' });
     }
     const request = await AddSeatRequest.findById(req.params.id);
     if (!request) {
@@ -251,12 +249,11 @@ router.delete('/:id/cancel', async (req, res) => {
     }
     console.log('Cancel add seat request:', {
       requestId: req.params.id,
-      userId: req.user._id,
-      requestUserId: request.userId,
+      userId: userId,
+      requestUserId: request.userId.toString(),
       status: request.status,
-      sessionId: req.sessionID,
     });
-    if (request.userId.toString() !== req.user._id.toString()) {
+    if (request.userId.toString() !== userId.toString()) {
       return res.status(403).json({ message: 'ไม่มีสิทธิ์ยกเลิกคำร้องนี้' });
     }
     if (!['submitted', 'instructor_approved'].includes(request.status)) {
