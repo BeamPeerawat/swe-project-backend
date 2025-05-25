@@ -10,9 +10,12 @@ const path = require('path');
 // GET all draft forms for a user
 router.get('/drafts/:userId', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
     const drafts = await OpenCourseRequest.find({
       userId: req.params.userId,
-      status: 'draft'
+      status: 'draft',
     }).select('courseCode courseTitle semester academicYear createdAt');
     const count = drafts.length;
     res.json({ drafts, count });
@@ -54,6 +57,12 @@ router.get('/opencourserequests', async (req, res) => {
 // GET pending requests for advisor
 router.get('/advisor/pending', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'advisor') {
+      return res.status(403).json({ message: 'เฉพาะอาจารย์ที่ปรึกษาเท่านั้นที่สามารถดูคำร้องนี้ได้' });
+    }
     const requests = await OpenCourseRequest.find({ status: 'pending_advisor' });
     res.json(requests);
   } catch (error) {
@@ -64,6 +73,12 @@ router.get('/advisor/pending', async (req, res) => {
 // GET pending requests for head
 router.get('/head/pending', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'head') {
+      return res.status(403).json({ message: 'เฉพาะหัวหน้าสาขาเท่านั้นที่สามารถดูคำร้องนี้ได้' });
+    }
     const requests = await OpenCourseRequest.find({ status: 'advisor_approved' });
     res.json(requests);
   } catch (error) {
@@ -88,12 +103,19 @@ router.get('/:id', async (req, res) => {
 // POST submit form
 router.post('/submit', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'student') {
+      return res.status(403).json({ message: 'เฉพาะนักศึกษาเท่านั้นที่สามารถยื่นคำร้องได้' });
+    }
     if (!req.body.userId) {
       return res.status(400).json({ message: 'userId is required' });
     }
     const form = new OpenCourseRequest({
       ...req.body,
-      status: 'pending_advisor' // เปลี่ยนจาก submitted เป็น pending_advisor
+      userId: req.user._id,
+      status: 'pending_advisor',
     });
     const savedForm = await form.save();
     res.status(201).json(savedForm);
@@ -105,17 +127,24 @@ router.post('/submit', async (req, res) => {
 // POST save draft
 router.post('/draft', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'student') {
+      return res.status(403).json({ message: 'เฉพาะนักศึกษาเท่านั้นที่สามารถบันทึกร่างได้' });
+    }
     if (!req.body.userId) {
       return res.status(400).json({ message: 'userId is required' });
     }
     const form = new OpenCourseRequest({
       ...req.body,
-      status: 'draft'
+      userId: req.user._id,
+      status: 'draft',
     });
     const savedForm = await form.save();
     const draftCount = await OpenCourseRequest.countDocuments({
       userId: req.body.userId,
-      status: 'draft'
+      status: 'draft',
     });
     res.status(201).json({ form: savedForm, draftCount });
   } catch (error) {
@@ -126,6 +155,12 @@ router.post('/draft', async (req, res) => {
 // POST approve request by advisor
 router.post('/:id/approve', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'advisor') {
+      return res.status(403).json({ message: 'เฉพาะอาจารย์ที่ปรึกษาเท่านั้นที่สามารถอนุมัติได้' });
+    }
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: 'Invalid ID format' });
     }
@@ -134,7 +169,6 @@ router.post('/:id/approve', async (req, res) => {
     if (form.status !== 'pending_advisor') {
       return res.status(400).json({ message: 'คำร้องนี้ไม่อยู่ในสถานะรอพิจารณาโดยอาจารย์ที่ปรึกษา' });
     }
-
     form.status = 'advisor_approved';
     form.advisorComment = req.body.comment || '';
     const updatedForm = await form.save();
@@ -147,6 +181,12 @@ router.post('/:id/approve', async (req, res) => {
 // POST reject request by advisor
 router.post('/:id/reject', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'advisor') {
+      return res.status(403).json({ message: 'เฉพาะอาจารย์ที่ปรึกษาเท่านั้นที่สามารถปฏิเสธได้' });
+    }
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: 'Invalid ID format' });
     }
@@ -155,7 +195,6 @@ router.post('/:id/reject', async (req, res) => {
     if (form.status !== 'pending_advisor') {
       return res.status(400).json({ message: 'คำร้องนี้ไม่อยู่ในสถานะรอพิจารณาโดยอาจารย์ที่ปรึกษา' });
     }
-
     form.status = 'advisor_rejected';
     form.advisorComment = req.body.comment || '';
     const updatedForm = await form.save();
@@ -168,6 +207,12 @@ router.post('/:id/reject', async (req, res) => {
 // POST approve request by head
 router.post('/:id/head/approve', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'head') {
+      return res.status(403).json({ message: 'เฉพาะหัวหน้าสาขาเท่านั้นที่สามารถอนุมัติได้' });
+    }
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: 'Invalid ID format' });
     }
@@ -176,7 +221,6 @@ router.post('/:id/head/approve', async (req, res) => {
     if (form.status !== 'advisor_approved') {
       return res.status(400).json({ message: 'คำร้องนี้ไม่อยู่ในสถานะรอพิจารณาโดยหัวหน้าสาขา' });
     }
-
     form.status = 'head_approved';
     form.headComment = req.body.comment || '';
     const updatedForm = await form.save();
@@ -189,6 +233,12 @@ router.post('/:id/head/approve', async (req, res) => {
 // POST reject request by head
 router.post('/:id/head/reject', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'head') {
+      return res.status(403).json({ message: 'เฉพาะหัวหน้าสาขาเท่านั้นที่สามารถปฏิเสธได้' });
+    }
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: 'Invalid ID format' });
     }
@@ -197,7 +247,6 @@ router.post('/:id/head/reject', async (req, res) => {
     if (form.status !== 'advisor_approved') {
       return res.status(400).json({ message: 'คำร้องนี้ไม่อยู่ในสถานะรอพิจารณาโดยหัวหน้าสาขา' });
     }
-
     form.status = 'head_rejected';
     form.headComment = req.body.comment || '';
     const updatedForm = await form.save();
@@ -210,13 +259,22 @@ router.post('/:id/head/reject', async (req, res) => {
 // PUT update form
 router.put('/:id', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'student') {
+      return res.status(403).json({ message: 'เฉพาะนักศึกษาเท่านั้นที่สามารถอัปเดตคำร้องได้' });
+    }
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: 'Invalid ID format' });
     }
     const form = await OpenCourseRequest.findById(req.params.id);
     if (!form) return res.status(404).json({ message: 'Form not found' });
+    if (form.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'ไม่มีสิทธิ์อัปเดตคำร้องนี้' });
+    }
 
-    Object.keys(req.body).forEach(key => {
+    Object.keys(req.body).forEach((key) => {
       if (key !== 'status') form[key] = req.body[key];
     });
 
@@ -230,15 +288,56 @@ router.put('/:id', async (req, res) => {
 // DELETE form
 router.delete('/:id', async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'student') {
+      return res.status(403).json({ message: 'เฉพาะนักศึกษาเท่านั้นที่สามารถลบคำร้องได้' });
+    }
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: 'Invalid ID format' });
     }
     const form = await OpenCourseRequest.findById(req.params.id);
     if (!form) return res.status(404).json({ message: 'Form not found' });
-
+    if (form.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'ไม่มีสิทธิ์ลบคำร้องนี้' });
+    }
     await form.deleteOne();
     res.json({ message: 'Form deleted' });
   } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// DELETE: Cancel a submitted open course request
+router.delete('/:id/cancel', async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+    }
+    if (req.user.role !== 'student') {
+      return res.status(403).json({ message: 'เฉพาะนักศึกษาเท่านั้นที่สามารถยกเลิกคำร้องได้' });
+    }
+    const form = await OpenCourseRequest.findById(req.params.id);
+    if (!form) {
+      return res.status(404).json({ message: 'ไม่พบคำร้อง' });
+    }
+    console.log('Cancel open course request:', {
+      requestId: req.params.id,
+      userId: req.user._id,
+      requestUserId: form.userId,
+      status: form.status,
+    });
+    if (form.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'ไม่มีสิทธิ์ยกเลิกคำร้องนี้' });
+    }
+    if (!['pending_advisor', 'advisor_approved'].includes(form.status)) {
+      return res.status(400).json({ message: 'สามารถยกเลิกได้เฉพาะคำร้องที่อยู่ในสถานะรอพิจารณาเท่านั้น' });
+    }
+    await OpenCourseRequest.findByIdAndDelete(req.params.id);
+    res.json({ message: 'ยกเลิกคำร้องสำเร็จ' });
+  } catch (error) {
+    console.error('Error canceling open course request:', error);
     res.status(500).json({ message: error.message });
   }
 });
