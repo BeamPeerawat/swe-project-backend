@@ -338,12 +338,13 @@ router.get('/:id/pdf', async (req, res) => {
     }
 
     // โหลด PDF ต้นฉบับ
-    const pdfPath = '../templates/RE.01-คำร้องทั่วไป.pdf';
-    const pdfBytes = await fs.readFile(pdfPath);
+    const templatePath = path.join(__dirname, '../templates/RE.01-คำร้องทั่วไป.pdf');
+    const pdfBytes = await fs.readFile(templatePath);
     const pdfDoc = await PDFDocument.load(pdfBytes);
 
     // โหลดฟอนต์ภาษาไทย
-    const fontBytes = await fs.readFile('../fonts/THSarabunNew.ttf');
+    const fontPath = path.join(__dirname, '../fonts/THSarabunNew.ttf');
+    const fontBytes = await fs.readFile(fontPath);
     pdfDoc.registerFontkit(fontkit);
     const thaiFont = await pdfDoc.embedFont(fontBytes);
 
