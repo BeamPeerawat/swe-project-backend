@@ -28,7 +28,7 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,PATCH,OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization,Cookie');
   next();
-}));
+});
 app.use(express.json());
 app.use(
   session({
@@ -70,6 +70,7 @@ app.use('/api/generalrequests', generalRequestRoutes);
 app.use((err, req, res, next) => {
   console.error('Server Error:', err.stack);
   res.status(500).json({ message: 'Internal Server Error' });
+  next();
 });
 
 // เริ่มเซิร์ฟเวอร์
